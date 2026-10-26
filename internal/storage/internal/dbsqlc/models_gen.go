@@ -486,6 +486,7 @@ type Process struct {
 	ExecutionSpec         processcmd.ExecutionSpec
 	NotifyOnExit          bool
 	NotifyMatch           string
+	ExitNoticeDecided     bool
 }
 
 type ProcessAction struct {
