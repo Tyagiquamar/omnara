@@ -2028,7 +2028,8 @@ VALUES ($1, false, statement_timestamp() - interval '2 hours', 60)
 	if err != nil {
 		t.Fatalf("get deleted machine: %v", err)
 	}
-	if machine.LifecycleState != "deleted" || machine.DeletedAt == nil {
+	if machine.LifecycleState != "deleted" || machine.DeletedAt == nil ||
+		machine.LifecycleReasonCode != "managed_work_admission_denied" {
 		t.Fatalf("machine was not deleted after reconcile cleanup: %+v", machine)
 	}
 }

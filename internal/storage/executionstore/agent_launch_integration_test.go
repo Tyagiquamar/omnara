@@ -3816,10 +3816,10 @@ func TestPoolLaunchMachineProvisioningActivatesBindingAfterDaemonRuntime(t *test
 	)
 	if err != nil || !ok {
 		t.Fatalf("claim pool machine deletion ok=%v err=%v", ok, err)
-	} else if deleting.Machine.LifecycleReasonCode != "test_cleanup" ||
-		deleting.Machine.LifecycleReasonMessage != "test cleanup" {
+	} else if deleting.Machine.LifecycleReasonCode != current.LifecycleReasonCode ||
+		deleting.Machine.LifecycleReasonMessage != current.LifecycleReasonMessage {
 		t.Fatalf(
-			"deleting reason code=%q message=%q, want test cleanup",
+			"deleting reason code=%q message=%q, want current reason",
 			deleting.Machine.LifecycleReasonCode,
 			deleting.Machine.LifecycleReasonMessage,
 		)
@@ -4378,7 +4378,7 @@ func TestPoolDeleteFailureFenceRejectsStaleFailure(t *testing.T) {
 		t.Fatalf("get current machine: %v", err)
 	}
 	if current.LifecycleState != "deleting" || !current.UpdatedAt.Equal(secondDeleting.Machine.UpdatedAt) ||
-		current.LifecycleReasonCode != "deleting_retry" {
+		current.LifecycleReasonCode != "agent_archived_cleanup" {
 		t.Fatalf("stale delete failure changed machine: %+v", current)
 	}
 	retryDelay := 10 * time.Minute
@@ -4438,8 +4438,25 @@ func TestPoolDeleteFailureFenceRejectsStaleFailure(t *testing.T) {
 	}
 	if retryDeleting.Machine.LifecycleState != "deleting" ||
 		retryDeleting.Machine.DeleteAttempts != failed.DeleteAttempts+1 ||
-		retryDeleting.Machine.LifecycleReasonCode != "delete_failed_retry" {
+		retryDeleting.Machine.LifecycleReasonCode != "agent_archived_cleanup" {
 		t.Fatalf("retry deleting machine = %+v", retryDeleting)
+	}
+	if err := store.Execution().CompletePoolMachineDeletion(
+		ctx,
+		testOrgID,
+		result.MachineBindings[0].MachineID,
+		retryDeleting.Machine.DeleteAttempts,
+	); err != nil {
+		t.Fatalf("complete pool machine deletion: %v", err)
+	}
+	deleted, err := store.Execution().GetMachine(ctx, testOrgID, result.MachineBindings[0].MachineID)
+	if err != nil {
+		t.Fatalf("get deleted machine: %v", err)
+	}
+	if deleted.LifecycleState != "deleted" ||
+		deleted.LifecycleReasonCode != "agent_archived_cleanup" ||
+		deleted.LifecycleReasonMessage != "cleaning up machine after agent archived" {
+		t.Fatalf("deleted machine = %+v", deleted)
 	}
 }
 

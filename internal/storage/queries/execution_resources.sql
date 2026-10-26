@@ -730,8 +730,8 @@ SET lifecycle_state = 'deleted',
     lifecycle_changed_at = statement_timestamp(),
     lifecycle_version = lifecycle_version + 1,
     deleted_at = statement_timestamp(),
-    lifecycle_reason_code = sqlc.arg(lifecycle_reason_code),
-    lifecycle_reason_message = sqlc.arg(lifecycle_reason_message),
+    lifecycle_reason_code = coalesce(sqlc.narg(lifecycle_reason_code)::text, lifecycle_reason_code),
+    lifecycle_reason_message = coalesce(sqlc.narg(lifecycle_reason_message)::text, lifecycle_reason_message),
     next_reconcile_after = NULL,
     updated_at = statement_timestamp()
 WHERE org_id = sqlc.arg(org_id)
@@ -814,8 +814,14 @@ UPDATE machines machine
 SET lifecycle_state = 'deleting',
     lifecycle_changed_at = statement_timestamp(),
     lifecycle_version = machine.lifecycle_version + 1,
-    lifecycle_reason_code = sqlc.narg(lifecycle_reason_code),
-    lifecycle_reason_message = sqlc.arg(lifecycle_reason_message),
+    lifecycle_reason_code = CASE
+      WHEN machine.lifecycle_state = 'deleting' THEN machine.lifecycle_reason_code
+      ELSE coalesce(machine.delete_reason_code, sqlc.narg(lifecycle_reason_code)::text)
+    END,
+    lifecycle_reason_message = CASE
+      WHEN machine.lifecycle_state = 'deleting' THEN machine.lifecycle_reason_message
+      ELSE coalesce(machine.delete_reason_message, sqlc.arg(lifecycle_reason_message)::text)
+    END,
     next_reconcile_after = statement_timestamp() + sqlc.arg(claim_timeout_seconds)::bigint * interval '1 second',
     delete_attempts = machine.delete_attempts + 1,
     provider_runtime_mismatch_since = CASE
@@ -888,6 +894,8 @@ UPDATE machines
 SET lifecycle_state = 'delete_failed',
     lifecycle_changed_at = statement_timestamp(),
     lifecycle_version = lifecycle_version + 1,
+    delete_reason_code = coalesce(delete_reason_code, lifecycle_reason_code),
+    delete_reason_message = coalesce(delete_reason_message, lifecycle_reason_message),
     lifecycle_reason_code = sqlc.narg(lifecycle_reason_code),
     lifecycle_reason_message = sqlc.arg(lifecycle_reason_message),
     next_reconcile_after = statement_timestamp() + sqlc.arg(retry_delay_milliseconds)::bigint * interval '1 millisecond',

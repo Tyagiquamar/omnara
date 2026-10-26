@@ -76,7 +76,7 @@ WHERE org_id = $1 AND id = $2
 		t.Fatalf("load reconciled machine: %v", err)
 	}
 	if lifecycleState != string(executionstore.MachineLifecycleStateDeleted) || deletedAt == nil ||
-		reasonCode != "provider_deleted" || mismatchSince == nil {
+		reasonCode != "provider_runtime_mismatch" || mismatchSince == nil {
 		t.Fatalf(
 			"reconciled machine = state %q reason %q deleted %v mismatch %v",
 			lifecycleState,

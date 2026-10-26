@@ -1017,7 +1017,7 @@ func (s *Store) CompletePoolMachineDeletion(
 	orgID, machineID uuid.UUID,
 	deleteAttempt int32,
 ) error {
-	return s.completePoolMachineDeletion(ctx, orgID, machineID, deleteAttempt, "provider_deleted", "")
+	return s.completePoolMachineDeletion(ctx, orgID, machineID, deleteAttempt, "", "")
 }
 
 func (s *Store) AbandonPoolMachineDeletion(
@@ -1154,7 +1154,7 @@ func (s *Store) completePoolMachineDeletion(
 			}
 			if _, err := qtx.DeletePoolMachine(ctx, dbsqlc.DeletePoolMachineParams{
 				LifecycleReasonCode:    storeutil.TextFromEmpty(reasonCode),
-				LifecycleReasonMessage: reasonMessage,
+				LifecycleReasonMessage: storeutil.TextFromEmpty(reasonMessage),
 				OrgID:                  orgID,
 				ID:                     machineID,
 				DeleteAttempt:          deleteAttempt,
