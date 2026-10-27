@@ -22,7 +22,7 @@ func TestRunCoreMaintenanceCleansUpDespiteAnotherTaskFailure(t *testing.T) {
 	pool, store := seedMaintenanceWebhook(t)
 	_, err := pool.Exec(ctx, "DROP TABLE user_auth_tokens")
 	require.NoError(t, err)
-	result := RunCore(ctx, store)
+	result := RunCore(ctx, store, true)
 	require.ErrorContains(t, result.AuthCleanupErr, "delete inactive auth tokens")
 	require.NoError(t, result.WebhookCleanupErr)
 	require.NoError(t, result.ReapRuntimeLocksErr)
@@ -43,7 +43,7 @@ func TestRunCoreMaintenanceParallelTasksAndCancellation(t *testing.T) {
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	done := make(chan CoreResult, 1)
-	go func() { done <- RunCore(runCtx, store) }()
+	go func() { done <- RunCore(runCtx, store, true) }()
 	require.Eventually(t, func() bool {
 		var count int
 		err := pool.QueryRow(ctx, "SELECT count(*) FROM event_webhook_deliveries").Scan(&count)

@@ -116,7 +116,7 @@ event_webhook:
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
 	until := time.Now().Add(10 * time.Second)
 	for {
-		runCoreMaintenanceTick(ctx, logger, store)
+		runCoreMaintenanceTick(ctx, logger, store, true)
 		var obsolete int
 		require.NoError(t, pool.QueryRow(ctx, `SELECT count(*) FROM integration_inbox
  WHERE (integration_id=$1 AND receipt_key LIKE 'old:%') OR integration_id=$2`, live, deleted).Scan(&obsolete))
@@ -126,7 +126,7 @@ event_webhook:
 		require.True(t, time.Now().Before(until), "retention must make progress across ticks")
 	}
 	for range 2 {
-		runCoreMaintenanceTick(ctx, logger, store)
+		runCoreMaintenanceTick(ctx, logger, store, true)
 		var completedCount, deletedCount int
 		require.NoError(t, pool.QueryRow(ctx,
 			`SELECT count(*) FROM integration_inbox WHERE integration_id=$1 AND receipt_key LIKE 'old:%'`,
@@ -187,7 +187,7 @@ func TestCoreMaintenanceInboxRetentionResumesAfterBatchTimeout(t *testing.T) {
 	require.NoError(t, err)
 	var logs bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
-	runCoreMaintenanceTick(ctx, logger, store)
+	runCoreMaintenanceTick(ctx, logger, store, true)
 	var remaining int
 	require.NoError(t, pool.QueryRow(ctx, `SELECT count(*) FROM integration_inbox`).Scan(&remaining))
 	require.Equal(t, 102, remaining, "timed-out batch rolls back every delete; the first batch stays committed")
@@ -196,7 +196,7 @@ func TestCoreMaintenanceInboxRetentionResumesAfterBatchTimeout(t *testing.T) {
 	logs.Reset()
 	until := time.Now().Add(10 * time.Second)
 	for {
-		runCoreMaintenanceTick(ctx, logger, store)
+		runCoreMaintenanceTick(ctx, logger, store, true)
 		require.NoError(t, pool.QueryRow(ctx, `SELECT count(*) FROM integration_inbox`).Scan(&remaining))
 		if remaining == 0 {
 			break

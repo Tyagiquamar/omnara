@@ -34,6 +34,7 @@ const (
 	idleMachineReconcileInterval     = time.Minute
 	deniedMachineReconcileInterval   = time.Hour
 	memoryCleanupInterval            = time.Hour
+	coreCleanupInterval              = 5 * time.Minute
 )
 
 type maintenanceOutcome struct {
@@ -376,11 +377,16 @@ func runCoreMaintenanceLoop(
 ) int {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	var nextCleanupAt time.Time
 	for {
 		now := time.Now().UTC()
+		cleanup := !now.Before(nextCleanupAt)
 		loopCtx, event := logent.MaintenanceLoop(ctx, interval, now)
-		runCoreMaintenanceTick(loopCtx, log, store)
+		cleanupBacklogged := runCoreMaintenanceTick(loopCtx, log, store, cleanup)
 		event.Done(loopCtx)
+		if cleanup && !cleanupBacklogged {
+			nextCleanupAt = now.Add(coreCleanupInterval)
+		}
 		select {
 		case <-ctx.Done():
 			<-healthErr
@@ -401,15 +407,17 @@ func runCoreMaintenanceTick(
 	ctx context.Context,
 	log *slog.Logger,
 	store *storage.Store,
-) {
+	cleanup bool,
+) (cleanupBacklogged bool) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			logpkg.Error(ctx, fmt.Errorf("core maintenance tick panicked: %v", recovered))
 			logpkg.Attach(ctx, logpkg.Fields{"error.stack": string(debug.Stack())})
 		}
 	}()
-	result := maintenance.RunCore(ctx, store)
+	result := maintenance.RunCore(ctx, store, cleanup)
 	reportCoreMaintenanceResult(ctx, log, result)
+	return result.CleanupBacklogged()
 }
 
 func reportCoreMaintenanceResult(ctx context.Context, log *slog.Logger, result maintenance.CoreResult) {
